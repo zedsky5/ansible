@@ -6,7 +6,8 @@
   # T1: Execute a shell command to find and filter log lines.
   - name: Last 20 application timing log lines
     ansible.builtin.shell:
-      cmd: "set -o pipefail && grep 'Ultradns quiz application took' /var/log/ultradns-quiz-madeup.log | tail -n 20"
+      cmd: "set -o pipefail && grep 'Ultradns quiz application took' /var/log/madeup.log | tail -n 20"
+      executable: /bin/bash
     register: log_lines_output
     # Allows the playbook to continue and handles the error condition in a later task.
     ignore_errors: true
@@ -14,22 +15,22 @@
   # T2: Pass the collected log lines to the Python script for analysis.
   - name: Mean and standard deviation Python script
     delegate_to: localhost
-    ansible.builtin.command: "python3 files/calculate_stats.py"
+    ansible.builtin.command: "python3 scripts/calculate_stats.py"
     args:
       # Pipes log_lines_output.stdout directly into our Python script.
       stdin: "{{ log_lines_output.stdout }}"
     register: stats_result
     when: log_lines_output.rc == 0
 
-  # T3: Calculated statistics for each server.
-  - name: 3. Statistic results
+  # T3: Display calculated statistics for each server.
+  - name: Statistic results
     ansible.builtin.debug:
       msg: |
         Server: {{ inventory_hostname }}
         Lines Found: {{ (stats_result.stdout | from_json).line_count }}
         Mean Timing: {{ (stats_result.stdout | from_json).mean }} ms
         Std Deviation: {{ (stats_result.stdout | from_json).std_dev }}
-    when: stats_result is defined and not stats_result.failed
+    when: stats_result.stdout is defined
 
   # T4: Message for servers where logs were not found.
   - name: Error handling
